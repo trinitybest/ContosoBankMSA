@@ -40,5 +40,9 @@ namespace ContosoBank_TH.Managers
         {
             return await this.userTable.ToListAsync();
         }
+        public async Task<List<User>> GetUsers(string username)
+        {
+            return await this.userTable.Where(user => user.UserName == username).ToListAsync();
+        }
     }
 }

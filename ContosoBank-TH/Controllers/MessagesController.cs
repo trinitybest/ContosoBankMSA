@@ -25,16 +25,117 @@ namespace ContosoBank_TH
             if (activity.Type == ActivityTypes.Message)
             {
                 ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
-                // calculate something for us to return
-                //int length = (activity.Text ?? string.Empty).Length;
+                var userMessage = activity.Text;
 
+                StateClient stateClient = activity.GetStateClient();
+                BotData userData = await stateClient.BotState.GetUserDataAsync(activity.ChannelId, activity.From.Id);
+         
                 // Set greeting 
-                string greeting = "Hello! What can I do for you?";
-                // the corresponding activity for greeting
-                //Activity reply = activity.CreateReply(greeting);
+                string output = "Hello! What can I do for you?";
+                if ( (!userData.GetProperty<bool>("SetAppointmentWaiting")) && (!userData.GetProperty<bool>("SetUserWaiting")) ) 
+                {
+                    if (userData.GetProperty<bool>("Greeting"))
+                    {
+                        output = "Hello again! What can I do for you?";
+                    }
+                    else
+                    {
+                        userData.SetProperty<bool>("Greeting", true);
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                    }
+                }
 
-                List<User> users = await AzureManager.AzureManagerInstace.GetUsers();
-                Activity reply = activity.CreateReply($"{users[0].LastName}");
+                if (userData.GetProperty<bool>("SetAppointmentWaiting"))
+                {
+                    userData.SetProperty<bool>("SetAppointmentWaiting", false);
+                    userData.SetProperty<bool>("SetAppointment", true);
+                    userData.SetProperty<string>("RequestDescription", userMessage);
+                    //userData.SetProperty<bool>("YesOrNoWaiting", true);
+                    await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                    output = "We have received your appointment, do you want to save it?";
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
+                }
+
+                if (userData.GetProperty<bool>("SetAppointment"))
+                {
+                    if(userMessage.ToLower() == "yes")
+                    {
+                        output = "You answered yes! Appointment is saved.";
+                        userData.SetProperty<bool>("SetAppointment", false);
+                        userData.SetProperty<string>("RequestDescription", "");
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                        
+                    }
+                    else
+                    {
+                        output = "You answered no! Appointment is not saved.";
+                        userData.SetProperty<bool>("SetAppointment", false);
+                        userData.SetProperty<string>("RequestDescription", "");
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                        
+                    }
+                }
+
+
+                if (userMessage.ToLower().Contains("appointment"))
+                {
+                    //output = "appointment?";
+                    //userData.GetProperty<bool>("SetAppointment")
+                    if (userData.GetProperty<bool>("SetUser"))
+                    {
+                        if (!userData.GetProperty<bool>("SetAppointment"))
+                        {
+                            output = "Please tell me about your appointment please:";
+                            userData.SetProperty<bool>("SetAppointmentWaiting", true);
+                            await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                            
+                        }
+                        else 
+                        {
+                            // save appointment
+                            output = "Appointment is saved.";
+                            
+                        }
+                    }
+                    else
+                    {
+                        output = "Please tell me your full name please:";
+                        userData.SetProperty<bool>("SetUserWaiting", true);
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                        
+                    }
+                }
+
+                if (userMessage.ToLower().Contains("name"))
+                {
+                    if (userData.GetProperty<bool>("SetUserWaiting"))
+                    {
+                        string name = userMessage;
+                        userData.SetProperty<bool>("SetUserWaiting", false);
+                        userData.SetProperty<bool>("SetUser", true);
+                        userData.SetProperty<string>("FirstName", name.Split(' ')[name.Split(' ').Length-2]);
+                        userData.SetProperty<string>("LastName", name.Split(' ')[name.Split(' ').Length-1]);
+                        userData.SetProperty<string>("UserName", name.Split(' ')[name.Split(' ').Length - 2] + name.Split(' ')[name.Split(' ').Length - 1]);
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                        output = $"Hey, {userData.GetProperty<string>("FirstName")} {userData.GetProperty<string>("LastName")}!, username is {userData.GetProperty<string>("UserName")}";
+                        
+                    }
+                    //else
+                    //{
+                    //    userData.SetProperty<bool>("SetUserWaiting", true);
+                    //    userData.SetProperty<bool>("SetUser", false);
+                    //    output = "Please tell me your full name please?";
+                    //}
+                    
+                }
+
+                
+                    Activity reply = activity.CreateReply(output);
+
+                //List<User> users = await AzureManager.AzureManagerInstace.GetUsers();
+                //Activity reply = activity.CreateReply($"{users[0].LastName}");
 
                 // return our reply to the user
                 //Activity reply = activity.CreateReply($"You sent {activity.Text} which was {length} characters");

@@ -20,6 +20,8 @@ namespace ContosoBank_TH.Models
         public string Gender { get; set; }
         [JsonProperty(PropertyName = "ip_address")]
         public string IpAddress { get; set; }
+        [JsonProperty(PropertyName = "username")]
+        public string UserName { get; set; }
 
 
     }
