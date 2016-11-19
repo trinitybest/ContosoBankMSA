@@ -7,6 +7,9 @@ using System.Web.Http;
 using System.Web.Http.Description;
 using Microsoft.Bot.Connector;
 using Newtonsoft.Json;
+using ContosoBank_TH.Managers;
+using System.Collections.Generic;
+using ContosoBank_TH.Models;
 
 namespace ContosoBank_TH
 {
@@ -28,7 +31,10 @@ namespace ContosoBank_TH
                 // Set greeting 
                 string greeting = "Hello! What can I do for you?";
                 // the corresponding activity for greeting
-                Activity reply = activity.CreateReply(greeting);
+                //Activity reply = activity.CreateReply(greeting);
+
+                List<User> users = await AzureManager.AzureManagerInstace.GetUsers();
+                Activity reply = activity.CreateReply($"{users[0].LastName}");
 
                 // return our reply to the user
                 //Activity reply = activity.CreateReply($"You sent {activity.Text} which was {length} characters");
