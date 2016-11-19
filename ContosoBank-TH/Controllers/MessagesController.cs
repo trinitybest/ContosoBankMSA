@@ -119,8 +119,65 @@ namespace ContosoBank_TH
                         userData.SetProperty<string>("LastName", name.Split(' ')[name.Split(' ').Length-1]);
                         userData.SetProperty<string>("UserName", name.Split(' ')[name.Split(' ').Length - 2] + name.Split(' ')[name.Split(' ').Length - 1]);
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
-                        output = $"Hey, {userData.GetProperty<string>("FirstName")} {userData.GetProperty<string>("LastName")}!, username is {userData.GetProperty<string>("UserName")}";
-                        
+
+                        List<User> userinfo = await AzureManager.AzureManagerInstace.GetUsers(userData.GetProperty<string>("UserName"));
+                        output = $"Hey, {userData.GetProperty<string>("FirstName")} {userData.GetProperty<string>("LastName")}!";
+                        Activity cardToConversation = activity.CreateReply(output);
+                        cardToConversation.Recipient = activity.From;
+                        cardToConversation.Type = "message";
+                        cardToConversation.Attachments = new List<Attachment>();
+                        List<CardImage> cardImages = new List<CardImage>();
+                        cardImages.Add(new CardImage(url: "http://www.drawinghowtodraw.com/drawing-lessons/drawing-animals-creatures-lessons/images/howtodrawducksdrawinglessons_html_5f6ac075.png"));
+                        List<CardAction> cardButtons = new List<CardAction>();
+                        CardAction cardButton = new CardAction()
+                        {
+                            Value ="http://google.com",
+                            Type = "openUrl",
+                            Title = "user name"
+                        };
+                        cardButtons.Add(cardButton);
+                        ThumbnailCard Card = new ThumbnailCard()
+                        {
+                            Title = "user info",
+                            Subtitle = userinfo[0].Email,
+                            Images = cardImages,
+                            Buttons = cardButtons
+                        };
+                        Attachment oneAttachment = Card.ToAttachment();
+                        cardToConversation.Attachments.Add(oneAttachment);
+                        await connector.Conversations.SendToConversationAsync(cardToConversation);
+                        return Request.CreateResponse(HttpStatusCode.OK);
+                    }
+                    if (userData.GetProperty<bool>("SetUser"))
+                    {
+                        List<User> userinfo = await AzureManager.AzureManagerInstace.GetUsers(userData.GetProperty<string>("UserName"));
+                        output = $"Hey, {userData.GetProperty<string>("FirstName")} {userData.GetProperty<string>("LastName")}!";
+                        Activity cardToConversation = activity.CreateReply(output);
+                        cardToConversation.Recipient = activity.From;
+                        cardToConversation.Type = "message";
+                        cardToConversation.Attachments = new List<Attachment>();
+                        List<CardImage> cardImages = new List<CardImage>();
+                        cardImages.Add(new CardImage(url: "http://www.drawinghowtodraw.com/drawing-lessons/drawing-animals-creatures-lessons/images/howtodrawducksdrawinglessons_html_5f6ac075.png"));
+                        List<CardAction> cardButtons = new List<CardAction>();
+                        CardAction cardButton = new CardAction()
+                        {
+                            Value = "http://google.com",
+                            Type = "openUrl",
+                            Title = "user name"
+                        };
+                        cardButtons.Add(cardButton);
+                        ThumbnailCard Card = new ThumbnailCard()
+                        {
+                            Title = $"{userData.GetProperty<string>("FirstName")}'s Info",
+                            //Subtitle = userinfo[0].ToString(),
+                            Images = cardImages,
+                            //Buttons = cardButtons,
+                            Text = userinfo[0].Gender + " " + userinfo[0].Email + " " + userinfo[0].IpAddress
+                        };
+                        Attachment oneAttachment = Card.ToAttachment();
+                        cardToConversation.Attachments.Add(oneAttachment);
+                        await connector.Conversations.SendToConversationAsync(cardToConversation);
+                        return Request.CreateResponse(HttpStatusCode.OK);
                     }
                     //else
                     //{
@@ -128,7 +185,7 @@ namespace ContosoBank_TH
                     //    userData.SetProperty<bool>("SetUser", false);
                     //    output = "Please tell me your full name please?";
                     //}
-                    
+
                 }
 
                 
