@@ -23,10 +23,15 @@ namespace ContosoBank_TH
             {
                 ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
                 // calculate something for us to return
-                int length = (activity.Text ?? string.Empty).Length;
+                //int length = (activity.Text ?? string.Empty).Length;
+
+                // Set greeting 
+                string greeting = "Hello! What can I do for you?";
+                // the corresponding activity for greeting
+                Activity reply = activity.CreateReply(greeting);
 
                 // return our reply to the user
-                Activity reply = activity.CreateReply($"You sent {activity.Text} which was {length} characters");
+                //Activity reply = activity.CreateReply($"You sent {activity.Text} which was {length} characters");
                 await connector.Conversations.ReplyToActivityAsync(reply);
             }
             else
