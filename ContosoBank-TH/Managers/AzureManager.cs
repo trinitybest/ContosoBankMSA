@@ -12,11 +12,12 @@ namespace ContosoBank_TH.Managers
         private static AzureManager instance;
         private MobileServiceClient client;
         private IMobileServiceTable<User> userTable;
-
+        private IMobileServiceTable<ServiceRequest> requestTable;
         private AzureManager()
         {
             this.client = new MobileServiceClient("http://contosobanktable1.azurewebsites.net");
             this.userTable = this.client.GetTable<User>();
+            this.requestTable = this.client.GetTable<ServiceRequest>();
         }
 
         public MobileServiceClient AzureClient
@@ -43,6 +44,11 @@ namespace ContosoBank_TH.Managers
         public async Task<List<User>> GetUsers(string username)
         {
             return await this.userTable.Where(user => user.UserName == username).ToListAsync();
+        }
+
+        public async Task SetRequest(ServiceRequest request)
+        {
+            await this.requestTable.InsertAsync(request);
         }
     }
 }

@@ -63,6 +63,12 @@ namespace ContosoBank_TH
                     if(userMessage.ToLower() == "yes")
                     {
                         output = "You answered yes! Appointment is saved.";
+                        // save appointment to database
+                        ServiceRequest request = new ServiceRequest();
+                        request.UserId = userData.GetProperty<string>("UserId");
+                        request.RequestDescription = userData.GetProperty<string>("RequestDescription");
+                        await AzureManager.AzureManagerInstace.SetRequest(request);
+
                         userData.SetProperty<bool>("SetAppointment", false);
                         userData.SetProperty<string>("RequestDescription", "");
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
@@ -95,6 +101,10 @@ namespace ContosoBank_TH
                         else 
                         {
                             // save appointment
+                            ServiceRequest request = new ServiceRequest();
+                            request.UserId = userData.GetProperty<string>("UserId");
+                            request.RequestDescription = userData.GetProperty<string>("RequestDescription");
+                            await AzureManager.AzureManagerInstace.SetRequest(request);
                             output = "Appointment is saved.";
                             
                         }
@@ -118,9 +128,11 @@ namespace ContosoBank_TH
                         userData.SetProperty<string>("FirstName", name.Split(' ')[name.Split(' ').Length-2]);
                         userData.SetProperty<string>("LastName", name.Split(' ')[name.Split(' ').Length-1]);
                         userData.SetProperty<string>("UserName", name.Split(' ')[name.Split(' ').Length - 2] + name.Split(' ')[name.Split(' ').Length - 1]);
-                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                        //await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
 
                         List<User> userinfo = await AzureManager.AzureManagerInstace.GetUsers(userData.GetProperty<string>("UserName"));
+                        userData.SetProperty<string>("UserId", userinfo[0].ID);
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                         output = $"Hey, {userData.GetProperty<string>("FirstName")} {userData.GetProperty<string>("LastName")}!";
                         Activity cardToConversation = activity.CreateReply(output);
                         cardToConversation.Recipient = activity.From;
@@ -131,17 +143,18 @@ namespace ContosoBank_TH
                         List<CardAction> cardButtons = new List<CardAction>();
                         CardAction cardButton = new CardAction()
                         {
-                            Value ="http://google.com",
+                            Value = "http://google.com",
                             Type = "openUrl",
                             Title = "user name"
                         };
                         cardButtons.Add(cardButton);
                         ThumbnailCard Card = new ThumbnailCard()
                         {
-                            Title = "user info",
-                            Subtitle = userinfo[0].Email,
+                            Title = $"{userData.GetProperty<string>("FirstName")}'s Info",
+                            //Subtitle = userinfo[0].ToString(),
                             Images = cardImages,
-                            Buttons = cardButtons
+                            //Buttons = cardButtons,
+                            Text = userinfo[0].Gender + " " + userinfo[0].Email + " " + userinfo[0].IpAddress
                         };
                         Attachment oneAttachment = Card.ToAttachment();
                         cardToConversation.Attachments.Add(oneAttachment);
