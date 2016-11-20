@@ -84,6 +84,38 @@ namespace ContosoBank_TH
                     }
                 }
 
+                if (userData.GetProperty<bool>("CurrencyWaiting"))
+                {
+                    string baseCurrency = userMessage.Split(' ')[0];
+                    string compareCurrency = userMessage.Split(' ')[1];
+                    HttpClient client = new HttpClient();
+                    string x = await client.GetStringAsync(new Uri("http://api.fixer.io/latest?base="+baseCurrency+"&symbols="+compareCurrency));
+                    Currency.RootObject rootObject;
+                    rootObject = JsonConvert.DeserializeObject<Currency.RootObject>(x);
+                    double rate = -1;
+                    switch (compareCurrency)
+                    {
+                        case "AUD":
+                            rate = rootObject.rates.AUD;
+                            break;
+                        case "GBP":
+                            rate = rootObject.rates.GBP;
+                            break;
+                        case "EUR":
+                            rate = rootObject.rates.EUR;
+                            break;
+                        case "CAD":
+                            rate = rootObject.rates.CAD;
+                            break;
+                        default:
+                            rate = -1;
+                            break;
+
+                    }
+                    
+                    output = $"1 {rootObject.@base} = {rate} {compareCurrency} ";
+                }
+
 
                 if (userMessage.ToLower().Contains("appointment"))
                 {
@@ -201,8 +233,15 @@ namespace ContosoBank_TH
 
                 }
 
-                
-                    Activity reply = activity.CreateReply(output);
+                if (userMessage.ToLower().Contains("currency"))
+                {
+                    userData.SetProperty<bool>("CurrencyWaiting", true);
+                    await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                    output= "Could you tell us the two currencies please?";
+                }
+
+
+                Activity reply = activity.CreateReply(output);
 
                 //List<User> users = await AzureManager.AzureManagerInstace.GetUsers();
                 //Activity reply = activity.CreateReply($"{users[0].LastName}");
