@@ -41,6 +41,7 @@ namespace ContosoBank_TH.Models
             public double TRY { get; set; }
             public double ZAR { get; set; }
             public double EUR { get; set; }
+            public double USD { get; set; }
         }
 
         public class RootObject

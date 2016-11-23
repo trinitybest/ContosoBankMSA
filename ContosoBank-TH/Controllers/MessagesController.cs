@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using ContosoBank_TH.Managers;
 using System.Collections.Generic;
 using ContosoBank_TH.Models;
+using ContosoBank_TH.API;
 
 namespace ContosoBank_TH
 {
@@ -29,7 +30,7 @@ namespace ContosoBank_TH
 
                 StateClient stateClient = activity.GetStateClient();
                 BotData userData = await stateClient.BotState.GetUserDataAsync(activity.ChannelId, activity.From.Id);
-         
+                
                 // Set greeting 
                 string output = "Hello! What can I do for you?";
                 if ( (!userData.GetProperty<bool>("SetAppointmentWaiting")) && (!userData.GetProperty<bool>("SetUserWaiting")) ) 
@@ -44,6 +45,13 @@ namespace ContosoBank_TH
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                     }
                 }
+
+                
+                
+                
+
+                //HttpClient LUISClient = new HttpClient();
+                //string LUISReply = await LUISClient.GetStringAsync();
 
                 if (userData.GetProperty<bool>("SetAppointmentWaiting"))
                 {
@@ -82,10 +90,14 @@ namespace ContosoBank_TH
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                         
                     }
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
                 }
 
                 if (userData.GetProperty<bool>("CurrencyWaiting"))
                 {
+                    
                     string baseCurrency = userMessage.Split(' ')[0];
                     string compareCurrency = userMessage.Split(' ')[1];
                     HttpClient client = new HttpClient();
@@ -107,13 +119,20 @@ namespace ContosoBank_TH
                         case "CAD":
                             rate = rootObject.rates.CAD;
                             break;
+                        case "USD":
+                            rate = rootObject.rates.USD;
+                            break;
                         default:
                             rate = -1;
                             break;
 
                     }
-                    
+                    userData.SetProperty<bool>("CurrencyWaiting", false);
+                    await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                     output = $"1 {rootObject.@base} = {rate} {compareCurrency} ";
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
                 }
 
 
@@ -138,7 +157,10 @@ namespace ContosoBank_TH
                             request.RequestDescription = userData.GetProperty<string>("RequestDescription");
                             await AzureManager.AzureManagerInstace.SetRequest(request);
                             output = "Appointment is saved.";
-                            
+                            Activity reply1 = activity.CreateReply(output);
+                            await connector.Conversations.ReplyToActivityAsync(reply1);
+                            return Request.CreateResponse(HttpStatusCode.OK);
+
                         }
                     }
                     else
@@ -146,7 +168,10 @@ namespace ContosoBank_TH
                         output = "Please tell me your full name please:";
                         userData.SetProperty<bool>("SetUserWaiting", true);
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
-                        
+                        Activity reply1 = activity.CreateReply(output);
+                        await connector.Conversations.ReplyToActivityAsync(reply1);
+                        return Request.CreateResponse(HttpStatusCode.OK);
+
                     }
                 }
 
@@ -232,14 +257,34 @@ namespace ContosoBank_TH
                     //}
 
                 }
-
                 if (userMessage.ToLower().Contains("currency"))
                 {
                     userData.SetProperty<bool>("CurrencyWaiting", true);
                     await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                     output= "Could you tell us the two currencies please?";
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
                 }
-
+                
+                Stock.RootObject rootObjectLUIS = await GetEntityFromLUIS(userMessage);
+                if(rootObjectLUIS.topScoringIntent.intent != "None")
+                { 
+                switch (rootObjectLUIS.topScoringIntent.intent)
+                {
+                    case "StockPrice":
+                        output = await GetStock(rootObjectLUIS.entities[0].entity);
+                        break;
+                    case "StockPrice2":
+                        output = await GetStock(rootObjectLUIS.entities[0].entity);
+                        break;
+                    default:
+                        break;
+                }
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
+                }
 
                 Activity reply = activity.CreateReply(output);
 
@@ -285,6 +330,37 @@ namespace ContosoBank_TH
             }
 
             return null;
+        }
+
+        private async Task<string> GetStock(string StockSymbol)
+        {
+            double? dblStockValue = await YahooAPI.GetStockRateAsync(StockSymbol);
+            if (dblStockValue == null)
+            {
+                return string.Format("This \"{0}\" is not an valid stock symbol", StockSymbol);
+            }
+            else
+            {
+                return string.Format("Stock Price of {0} is {1}", StockSymbol, dblStockValue);
+            }
+        }
+
+        private static async Task<Stock.RootObject> GetEntityFromLUIS(string Query)
+        {
+            Query = Uri.EscapeDataString(Query);
+            Stock.RootObject Data = new Stock.RootObject();
+            using (HttpClient client = new HttpClient())
+            {
+                string RequestURI = "https://api.projectoxford.ai/luis/v2.0/apps/3d39d203-9f0b-4d16-84cd-f38ffefff37f?subscription-key=1842e783fce74b328964c942cb26b698&q=" + Query;
+;               HttpResponseMessage msg = await client.GetAsync(RequestURI);
+
+                if (msg.IsSuccessStatusCode)
+                {
+                    var JsonDataResponse = await msg.Content.ReadAsStringAsync();
+                    Data = JsonConvert.DeserializeObject<Stock.RootObject>(JsonDataResponse);
+                }
+            }
+            return Data;
         }
     }
 }
