@@ -11,6 +11,8 @@ using ContosoBank_TH.Managers;
 using System.Collections.Generic;
 using ContosoBank_TH.Models;
 using ContosoBank_TH.API;
+using Microsoft.ProjectOxford.Vision;
+using Microsoft.ProjectOxford.Vision.Contract;
 
 namespace ContosoBank_TH
 {
@@ -26,6 +28,7 @@ namespace ContosoBank_TH
             if (activity.Type == ActivityTypes.Message)
             {
                 ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
+        
                 var userMessage = activity.Text;
 
                 StateClient stateClient = activity.GetStateClient();
@@ -46,19 +49,77 @@ namespace ContosoBank_TH
                     }
                 }
 
-                
-                
-                
 
-                //HttpClient LUISClient = new HttpClient();
-                //string LUISReply = await LUISClient.GetStringAsync();
+                if (userData.GetProperty<bool>("ImageWaiting"))
+                    {
+
+                        VisionServiceClient VisionServiceClient = new VisionServiceClient("72eb5e0c1cdb41b380e77b67c1797b81");
+
+                        AnalysisResult analysisResult = await VisionServiceClient.DescribeAsync(activity.Attachments[0].ContentUrl, 3);
+
+                        string visionReply = $"{analysisResult.Description.Captions[0].Text}";
+                        if (visionReply.ToLower().Contains("coin"))
+                        {
+                            userData.SetProperty<bool>("ImageWaiting", false);
+                            userData.SetProperty<bool>("ImageYesOrNoWaiting", true);
+                            await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                            Activity reply1 = activity.CreateReply($"Your image shows: {visionReply}. Is your request money related?");
+                            await connector.Conversations.ReplyToActivityAsync(reply1);
+
+                            return Request.CreateResponse(HttpStatusCode.OK);
+                        }
+                        else
+                        {
+                            userData.SetProperty<bool>("ImageWaiting", false);
+                            await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                            Activity reply1 = activity.CreateReply($"Your image shows: {visionReply}. Sorry it's not related to our bank service.");
+                            await connector.Conversations.ReplyToActivityAsync(reply1);
+
+                            return Request.CreateResponse(HttpStatusCode.OK);
+                        }
+
+
+                    }
+
+                    if (userData.GetProperty<bool>("ImageYesOrNoWaiting"))
+                    {
+                        if (userMessage.ToLower() == "yes")
+                        {
+                            output = "You answered yes! Tell me more about your appointment please:";
+                            userData.SetProperty<bool>("ImageYesOrNoWaiting", false);
+                            userData.SetProperty<bool>("SetAppointmentWaiting", true);
+                            userData.SetProperty<string>("RequestType", "Money");
+                            await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+
+                        }
+                        else
+                        {
+                            output = "You answered no! Tell me more about your appointment please:";
+                            userData.SetProperty<bool>("ImageYesOrNoWaiting", false);
+                            userData.SetProperty<bool>("SetAppointmentWaiting", true);
+                            await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+
+                        }
+                        Activity reply1 = activity.CreateReply(output);
+                        await connector.Conversations.ReplyToActivityAsync(reply1);
+                        return Request.CreateResponse(HttpStatusCode.OK);
+
+                    }
+                    
+
+                    //HttpClient LUISClient = new HttpClient();
+                    //string LUISReply = await LUISClient.GetStringAsync();
 
                 if (userData.GetProperty<bool>("SetAppointmentWaiting"))
                 {
                     userData.SetProperty<bool>("SetAppointmentWaiting", false);
                     userData.SetProperty<bool>("SetAppointment", true);
                     userData.SetProperty<string>("RequestDescription", userMessage);
-                    //userData.SetProperty<bool>("YesOrNoWaiting", true);
+                    if(userData.GetProperty<string>("RequestType") == "")
+                    {
+                        userData.SetProperty<string>("RequestType", "General");
+                    }
+                    
                     await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                     output = "We have received your appointment, do you want to save it?";
                     Activity reply1 = activity.CreateReply(output);
@@ -75,10 +136,12 @@ namespace ContosoBank_TH
                         ServiceRequest request = new ServiceRequest();
                         request.UserId = userData.GetProperty<string>("UserId");
                         request.RequestDescription = userData.GetProperty<string>("RequestDescription");
+                        request.ServiceType = userData.GetProperty<string>("RequestType");
                         await AzureManager.AzureManagerInstace.SetRequest(request);
 
                         userData.SetProperty<bool>("SetAppointment", false);
                         userData.SetProperty<string>("RequestDescription", "");
+                        userData.SetProperty<string>("RequestType", "");
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                         
                     }
@@ -87,6 +150,7 @@ namespace ContosoBank_TH
                         output = "You answered no! Appointment is not saved.";
                         userData.SetProperty<bool>("SetAppointment", false);
                         userData.SetProperty<string>("RequestDescription", "");
+                        userData.SetProperty<string>("RequestType", "");
                         await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
                         
                     }
@@ -135,8 +199,17 @@ namespace ContosoBank_TH
                     return Request.CreateResponse(HttpStatusCode.OK);
                 }
 
+                if (userMessage.ToLower().Contains("image"))
+                {
+                    userData.SetProperty<bool>("ImageWaiting", true);
+                    await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                    output = "Please upload an image:";
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
+                }
 
-                if (userMessage.ToLower().Contains("appointment"))
+                    if (userMessage.ToLower().Contains("appointment"))
                 {
                     //output = "appointment?";
                     //userData.GetProperty<bool>("SetAppointment")
@@ -261,6 +334,15 @@ namespace ContosoBank_TH
                         await connector.Conversations.SendToConversationAsync(cardToConversation);
                         return Request.CreateResponse(HttpStatusCode.OK);
                     }
+                    else
+                    {
+                        output = "Please tell me your full name please:";
+                        userData.SetProperty<bool>("SetUserWaiting", true);
+                        await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                        Activity reply1 = activity.CreateReply(output);
+                        await connector.Conversations.ReplyToActivityAsync(reply1);
+                        return Request.CreateResponse(HttpStatusCode.OK);
+                    }
                     //else
                     //{
                     //    userData.SetProperty<bool>("SetUserWaiting", true);
@@ -269,7 +351,23 @@ namespace ContosoBank_TH
                     //}
 
                 }
-                if (userMessage.ToLower().Contains("currency"))
+
+                if (userMessage.ToLower().Contains("clear"))
+                {
+                    output = "User Info is cleared!";
+                    userData.SetProperty<bool>("SetUserWaiting", false);
+                    userData.SetProperty<bool>("SetUser", false);
+                    userData.SetProperty<string>("FirstName", "");
+                    userData.SetProperty<string>("LastName", "");
+                    userData.SetProperty<string>("UserName", "");
+                    userData.SetProperty<string>("UserId", "");
+                    await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
+                    Activity reply1 = activity.CreateReply(output);
+                    await connector.Conversations.ReplyToActivityAsync(reply1);
+                    return Request.CreateResponse(HttpStatusCode.OK);
+                }
+
+                    if (userMessage.ToLower().Contains("currency"))
                 {
                     userData.SetProperty<bool>("CurrencyWaiting", true);
                     await stateClient.BotState.SetUserDataAsync(activity.ChannelId, activity.From.Id, userData);
