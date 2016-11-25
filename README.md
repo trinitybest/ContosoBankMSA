@@ -1,2 +1,2 @@
 # ContosoBankMSA
-A Bot Framework for MSA
+A Bot Project for MSA.
